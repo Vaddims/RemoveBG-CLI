@@ -1,8 +1,8 @@
 {
   "name": "removebg-cli",
+  "displayName": "RemoveBG CLI",
   "version": "1.0.0",
   "description": "Automatized work with Removebg servers. Cli included for more flexibility",
-  "main": "index.js",
   "scripts": {
     "start": "tsc --project . && node ./index.js"
   },
@@ -10,7 +10,11 @@
     "type": "git",
     "url": "git+https://github.com/Vaddims/RemoveBG-CLI.git"
   },
-  "author": "Vaddims",
+  "author": {
+     "name": "Vaddims",
+     "email": "vadym.iefremov@gmail.com",
+     "url": "https://github.com/Vaddims"
+  },
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/Vaddims/RemoveBG-CLI/issues"
