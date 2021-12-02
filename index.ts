@@ -6,31 +6,46 @@ import path from 'path';
 import fs from 'fs';
 import { default as imageProcessData } from './image-process.json';
 
-// ! Cli stuff
-/** Cli interface */
 const cli = readline.createInterface({
 	terminal: true,
 	input: process.stdin,
 	output: process.stdout,
 });
 
-/** Cli question */
 const cliQuestion = (question: string) => new Promise<string>((res) => cli.question(`${question} `, res));
 
-/** Cli question with `fixed answers`
- * (The loop is activated if the user
- *  writes an incorrect answer) */
-const cliFixedQuestion = async (question: string, answers: string[]) => {
-	const validAnswerString = answers.toString().replaceAll(',', ' | ');
-	do {
-		const userAnswer = await cliQuestion(`${question} [${validAnswerString}]`);
-		if (answers.find((answer) => answer === userAnswer)) return userAnswer;
-		console.log('Invalid answer');
-	} while (true);
-};
+/** Run the loop until the user writes a valid response */
+async function cliFixedQuestion(question: string, possibleAnswers: string[]) {
+	const stringedPossibleAnswers = possibleAnswers.join(' | ');
 
-/** Cli `dichotomous` question (Accepts only 2 answers, `yes` or `no`) */
-const cliDichotomousQuestion = async (question: string) => ((await cliFixedQuestion(question, ['yes', 'no'])) === 'yes' ? true : false);
+	do {
+		const response = await cliQuestion(`${question} [${stringedPossibleAnswers}]`);
+
+		if (!possibleAnswers.find((possibleAnswer) => possibleAnswer === response)) {
+			console.warn(`Invalid answer`);
+		}
+
+		return response;
+	} while (true);
+}
+
+/** Accepts only `yes` or `no` */
+async function cliDichotomousQuestion(response: string) {
+	const isAllowedAnswer = (allowedAnswers: string[]) =>
+		allowedAnswers.find((allowedAnswer) => allowedAnswer === response);
+
+	do {
+		if (isAllowedAnswer(['', 'y', 'yes'])) {
+			return true;
+		}
+
+		if (isAllowedAnswer(['n', 'no'])) {
+			return false;
+		}
+
+		console.warn('Invalid answer');
+	} while (true);
+}
 
 // ! Main app proccess
 console.log('Booting...');
@@ -100,7 +115,9 @@ async function accoutInfo() {
 				console.log('Too many requests in a short amount of time');
 				const unixRequestAvailable = Number(response.headers.get('X-RateLimit-Reset'));
 				if (!unixRequestAvailable) {
-					console.log(`Unexpected error occurred on the \`next request available in x seconds \`. Restarting account info request`);
+					console.log(
+						`Unexpected error occurred on the \`next request available in x seconds \`. Restarting account info request`
+					);
 					continue;
 				}
 
@@ -124,21 +141,25 @@ async function accoutInfo() {
 /** Proccess all images in a direction to the required reesult */
 async function imageProccess() {
 	// System directories
-	const apiKeys = imageProcessData.apiKeys.length > 0 ? imageProcessData.apiKeys : (await cliQuestion('Api keys:')).split(' ');
+	const apiKeys =
+		imageProcessData.apiKeys.length > 0 ? imageProcessData.apiKeys : (await cliQuestion('Api keys:')).split(' ');
 	const inputImageDir = imageProcessData.dir.input ?? (await cliQuestion('Get images from directory:'));
 	const outputImageDir = imageProcessData.dir.output ?? (await cliQuestion('Save images in directory:'));
 
 	// A simple value validness checker
-	if (apiKeys.length === 0 || !inputImageDir || !outputImageDir) return console.log('Unexpected input values! Exiting image proccess mode');
-	const validImageExtensionsFilter = (imageName: string) => ['png', 'jpg', 'jpeg'].find((imageExt) => imageName.endsWith(imageExt));
+	if (apiKeys.length === 0 || !inputImageDir || !outputImageDir)
+		return console.log('Unexpected input values! Exiting image proccess mode');
+	const validImageExtensionsFilter = (imageName: string) =>
+		['png', 'jpg', 'jpeg'].find((imageExt) => imageName.endsWith(imageExt));
 
 	// Get and find the required for proccess images, from the provided directories above
 	const inputImageNames = fs.readdirSync(inputImageDir).filter(validImageExtensionsFilter);
 	const outputImageNames = fs.readdirSync(outputImageDir).filter(validImageExtensionsFilter);
 	const uniqueImageNames = inputImageNames.filter(
 		(inputImageName) =>
-			!outputImageNames.find((outputImageName) => path.parse(inputImageName).name === path.parse(outputImageName).name) &&
-			fs.statSync(path.join(inputImageDir, inputImageName)).isFile()
+			!outputImageNames.find(
+				(outputImageName) => path.parse(inputImageName).name === path.parse(outputImageName).name
+			) && fs.statSync(path.join(inputImageDir, inputImageName)).isFile()
 	);
 
 	let mainApiKey = apiKeys[0]!;
@@ -174,7 +195,8 @@ async function imageProccess() {
 		formData.append('image_file', fs.createReadStream(inputImagePath));
 		formData.append('format', outputImageExtension);
 		formData.append('size', 'auto');
-		if (imageProcessData.dir.background) formData.append('bg_image_file', fs.createReadStream(imageProcessData.dir.background));
+		if (imageProcessData.dir.background)
+			formData.append('bg_image_file', fs.createReadStream(imageProcessData.dir.background));
 
 		requestLoop: do {
 			console.log(`Starting request for image with the name ${imageBasename} (${i + 1} / ${uniqueImageNames.length})`);
@@ -206,7 +228,9 @@ async function imageProccess() {
 				console.log('Too many requests in a short amount of time');
 				const unixRequestAvailable = Number(response.headers.get('X-RateLimit-Reset'));
 				if (!unixRequestAvailable) {
-					console.log(`An unexpected error occurred on the \`next request available in x seconds \`. Skipping this image process`);
+					console.log(
+						`An unexpected error occurred on the \`next request available in x seconds \`. Skipping this image process`
+					);
 					continue;
 				}
 
