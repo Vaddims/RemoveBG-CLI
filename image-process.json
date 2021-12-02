@@ -1,0 +1,10 @@
+{
+  "apiKeys": [],
+  "outputImageFormat": "png",
+  "dialog": true,
+  "dir": {
+    "input": "",
+    "output": "",
+    "background": ""
+  }
+}

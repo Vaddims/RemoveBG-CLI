@@ -4,33 +4,7 @@ import fetch from 'node-fetch';
 import FormData from 'form-data';
 import path from 'path';
 import fs from 'fs';
-
-/** Place here all your needed data to skip
- * common questions for the image proccess on each app boot */
-const IMAGE_PROCCESS_DATA = {
-	/** All `api keys` (You can add multiple API keys.
-	 * In case one of them has a problem,
-	 * the application will switch to the
-	 * next one and notify you.) */
-	API_KEYS: [],
-	/** The `directory` on your system from
-	 * which you want the image process to
-	 * capture the images that need to be edited. */
-	INPUT_DIR: '',
-	/** The path to the `background` of your images (If needed) */
-	INPUT_BACKGROUND: '',
-	/** The `directory` on your system in
-	 * which you want to save all the edited images */
-	OUTPUT_DIR: '',
-	/** The image `format` that the output images will have
-	 * (For transparency use only `png` extension)
-	 * (Can set to `png` or `jpg`) */
-	OUTPUT_IMAGE_FORMAT: 'png',
-	/** A state indicating whether the user wants to
-	 * automate the image editing process or
-	 * have a breakpoint for each one. */
-	SKIP_DIALOG: false,
-};
+import { default as imageProcessData } from './image-process.json';
 
 // ! Cli stuff
 /** Cli interface */
@@ -150,9 +124,9 @@ async function accoutInfo() {
 /** Proccess all images in a direction to the required reesult */
 async function imageProccess() {
 	// System directories
-	const apiKeys = IMAGE_PROCCESS_DATA.API_KEYS.length > 0 ? IMAGE_PROCCESS_DATA.API_KEYS : (await cliQuestion('Api keys:')).split(' ');
-	const inputImageDir = IMAGE_PROCCESS_DATA.INPUT_DIR ?? (await cliQuestion('Get images from directory:'));
-	const outputImageDir = IMAGE_PROCCESS_DATA.OUTPUT_DIR ?? (await cliQuestion('Save images in directory:'));
+	const apiKeys = imageProcessData.apiKeys.length > 0 ? imageProcessData.apiKeys : (await cliQuestion('Api keys:')).split(' ');
+	const inputImageDir = imageProcessData.dir.input ?? (await cliQuestion('Get images from directory:'));
+	const outputImageDir = imageProcessData.dir.output ?? (await cliQuestion('Save images in directory:'));
 
 	// A simple value validness checker
 	if (apiKeys.length === 0 || !inputImageDir || !outputImageDir) return console.log('Unexpected input values! Exiting image proccess mode');
@@ -174,17 +148,17 @@ async function imageProccess() {
 	/** The state of skipping all dialog processes.
 	 * As long as 'true', no additional cli questions
 	 *  will be displayed unless there is any problem. */
-	let skipDialog = IMAGE_PROCCESS_DATA.SKIP_DIALOG ?? false;
+	let dialog = imageProcessData.dialog ?? false;
 	// Proccess each image
 	for (let i = 0; i < uniqueImageNames.length; i++) {
 		const imageBasename = uniqueImageNames[i]!;
 		const imageName = path.parse(imageBasename).name;
-		if (!skipDialog) {
+		if (!dialog) {
 			const validAnswers = ['yes', 'force', 'exit'];
 			const answer = await cliFixedQuestion('Proccess next image?', validAnswers);
 			switch (answer) {
 				case 'force':
-					skipDialog = true;
+					dialog = false;
 					break;
 				case 'exit':
 					console.log('Exiting image editing proccess');
@@ -193,14 +167,14 @@ async function imageProccess() {
 		}
 
 		const inputImagePath = path.join(inputImageDir, imageBasename);
-		const outputImageExtension = IMAGE_PROCCESS_DATA.OUTPUT_IMAGE_FORMAT;
+		const outputImageExtension = imageProcessData.outputImageFormat;
 
 		/** Body form */
 		const formData = new FormData();
 		formData.append('image_file', fs.createReadStream(inputImagePath));
 		formData.append('format', outputImageExtension);
 		formData.append('size', 'auto');
-		if (IMAGE_PROCCESS_DATA.INPUT_BACKGROUND) formData.append('bg_image_file', fs.createReadStream(IMAGE_PROCCESS_DATA.INPUT_BACKGROUND));
+		if (imageProcessData.dir.background) formData.append('bg_image_file', fs.createReadStream(imageProcessData.dir.background));
 
 		requestLoop: do {
 			console.log(`Starting request for image with the name ${imageBasename} (${i + 1} / ${uniqueImageNames.length})`);
@@ -238,7 +212,7 @@ async function imageProccess() {
 
 				/** Get the time difference from the next available request in seconds */
 				const secondDif = () => Math.floor((new Date().getTime() - unixRequestAvailable) / 1000);
-				const waitForTimeout = skipDialog || (await cliDichotomousQuestion(`Try again in ${secondDif()} seconds?`));
+				const waitForTimeout = !dialog || (await cliDichotomousQuestion(`Try again in ${secondDif()} seconds?`));
 				if (waitForTimeout) {
 					console.log(`In ${secondDif()} seconds next request wave will be started`);
 					await new Promise((res) => setTimeout(res, (secondDif() + 1) * 1000));
