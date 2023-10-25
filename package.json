@@ -2,7 +2,7 @@
   "name": "removebg-cli",
   "displayName": "RemoveBG CLI",
   "version": "1.0.0",
-  "description": "Automatized work with Removebg servers. Cli included for more flexibility",
+  "description": "Automate the process of removing backgrounds from images utilizing the Remove.bg service",
   "scripts": {
     "start": "tsc --project . && node ./index.js"
   },
